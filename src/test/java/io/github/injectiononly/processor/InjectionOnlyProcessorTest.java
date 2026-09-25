@@ -112,4 +112,50 @@ class InjectionOnlyProcessorTest {
 
         assertTrue(result.success, "a class with no @InjectionOnly should never be touched by the processor");
     }
+
+    @Test
+    void doesNotApplyToNestedTypeBodies() throws IOException {
+
+        String source = """
+                package t;
+                import io.github.injectiononly.annotation.InjectionOnly;
+                @InjectionOnly
+                class DemoService {
+                    static class NestedHelper {
+                        void create() {
+                            new Helper();
+                        }
+                    }
+                    static class Helper {}
+                }
+                """;
+
+        CompilationTestHelper.Result result = CompilationTestHelper.compile("t.DemoService", source);
+
+        assertTrue(result.success,
+                "nested type bodies are outside the annotated type's direct enforcement scope: "
+                        + result.diagnostics);
+    }
+
+    @Test
+    void doesNotScanSiblingTypesInTheSameCompilationUnit() throws IOException {
+
+        String source = """
+                package t;
+                import io.github.injectiononly.annotation.InjectionOnly;
+                @InjectionOnly
+                class DemoService {}
+                class PlainService {
+                    void create() {
+                        new Helper();
+                    }
+                }
+                class Helper {}
+                """;
+
+        CompilationTestHelper.Result result = CompilationTestHelper.compile("t.DemoService", source);
+
+        assertTrue(result.success,
+                "only the annotated type's source tree should be checked: " + result.diagnostics);
+    }
 }

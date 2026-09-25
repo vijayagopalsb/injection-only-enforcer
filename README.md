@@ -1,52 +1,58 @@
-
 # InjectionOnly Enforcer
 
-Compile-time guardrails for dependency injection discipline in Java.
+**Compile-time guardrails for dependency injection discipline in Java.**
 
-InjectionOnly Enforcer helps teams keep their classes IoC-first by discouraging manual object creation inside classes marked with `@InjectionOnly`. If a class is designed to receive dependencies through dependency injection, this library helps enforce that rule at compile time.
-
-This is especially useful in Spring-based applications, where services, repositories, clients, and other managed components should not construct their own collaborators manually.
+InjectionOnly Enforcer is a Java annotation processor that helps teams keep
+classes IoC-first by discouraging manual object creation inside classes marked
+with `@InjectionOnly`. It is especially useful in Spring applications, where
+services, repositories, clients, and other managed components should receive
+their collaborators through dependency injection rather than construct them
+manually.
 
 ## Why this project exists
 
-In large Java applications, especially with Spring, it is easy for a service to drift into this pattern:
+In large Java applications, it is easy for a service to drift into patterns
+like these:
 
 ```java
 @Service
 public class UserService {
     private final UserRepository repository = new UserRepository();
 }
+```
 
-or:
-
+```java
 public class OrderService {
     public void create() {
         PaymentClient client = new PaymentClient();
         client.pay();
     }
 }
+```
 
-These patterns often hide dependency lifecycle problems, make code harder to test, and reduce the value of inversion of control.
+These patterns can hide dependency lifecycle problems, make code harder to test,
+and reduce the value of inversion of control.
 
- @InjectionOnly  gives you a simple compile-time rule:
+`@InjectionOnly` provides a compile-time rule:
 
-• If a class is marked  @InjectionOnly 
-• then manual construction using  new  is rejected
-• except for explicitly allowed types or standard JDK types
+- Classes marked with `@InjectionOnly` cannot manually instantiate non-exempt
+  types with `new`.
+- Types listed in the annotation's `allow` option are exempt.
+- Types in `java.*` and `javax.*` are exempt automatically.
 
-This keeps dependency construction centralized and predictable.
+This helps keep dependency construction centralized and predictable.
 
-Features
+## Features
 
-• Enforces  @InjectionOnly  on annotated classes
-• Rejects manual  new  inside the annotated class
-• Allows JDK types automatically
-• Supports an explicit allowlist via  @InjectionOnly(allow = {...}) 
-• Works as a Java annotation processor
-• Lightweight and easy to plug into Maven or Gradle builds
+- Rejects manual construction of non-exempt types inside annotated classes.
+- Allows JDK and `javax.*` types automatically.
+- Supports an explicit allowlist through `@InjectionOnly(allow = {...})`.
+- Runs as a Java annotation processor.
+- Integrates with Maven and Gradle annotation-processing builds.
 
-Annotation
+## Annotation
 
+```java
 package io.github.injectiononly.annotation;
 
 import java.lang.annotation.ElementType;
@@ -59,14 +65,18 @@ import java.lang.annotation.Target;
 public @interface InjectionOnly {
     Class<?>[] allow() default {};
 }
+```
 
-Example
+## Usage
 
+Dependencies should be supplied to an `@InjectionOnly` class, typically through
+constructor injection:
+
+```java
 import io.github.injectiononly.annotation.InjectionOnly;
 
 @InjectionOnly
 public class OrderService {
-
     private final PaymentClient paymentClient;
 
     public OrderService(PaymentClient paymentClient) {
@@ -74,52 +84,66 @@ public class OrderService {
     }
 
     public void createOrder() {
-        // allowed: dependency passed in via constructor
         paymentClient.pay();
 
-        // forbidden: manual construction inside an @InjectionOnly class
+        // These constructions are rejected unless their types are exempt.
         // new PaymentClient();
-
-        // also forbidden for many custom types
         // new OrderValidator();
     }
 }
+```
 
-This compiles cleanly only if the dependency is received via injection rather than created manually.
+For a complete Maven walkthrough, see the [demo guide](./DEMO.md).
 
-Allow list
+## Allowing specific types
 
-Sometimes a type is a plain value object or utility that is acceptable to construct directly, even in an injection-only class.
+Use `allow` for application or third-party types that are safe to construct
+directly, such as value objects:
 
+```java
 import io.github.injectiononly.annotation.InjectionOnly;
 
-@InjectionOnly(allow = { OrderRequest.class, UUID.class })
+@InjectionOnly(allow = {OrderRequest.class})
 public class OrderService {
-
     public void create() {
         OrderRequest request = new OrderRequest();
-        // allowed because declared in allow()
     }
 }
+```
 
-The processor also exempts standard JDK types automatically, such as:
+Types under `java.*` and `javax.*` do not need to be listed. For example,
+standard collection classes and exceptions are exempt automatically.
 
-•  java.lang.String 
-•  java.util.ArrayList 
-•  java.lang.StringBuilder 
-• standard runtime exceptions like  IllegalArgumentException 
+## Installation
 
-Installation
+### Requirements
 
-Maven
+- JDK 17 or later.
+- Maven or Gradle configured to run Java annotation processors.
 
-Add the dependency and register the processor:
+The examples use version `1.0.0`. The library is not yet published to Maven
+Central. Until it is published, build and install it in your local Maven
+repository from a checkout:
 
+```shell
+mvn clean install
+```
+
+After that, the Maven and Gradle examples below can resolve version `1.0.0`
+from your local Maven repository. Once a release is published to a package
+repository, users can resolve it from that repository instead.
+
+### Maven
+
+Add the library as a dependency and configure it as an annotation processor:
+
+```xml
 <dependencies>
     <dependency>
         <groupId>io.github.injectiononly</groupId>
         <artifactId>injection-only-enforcer</artifactId>
         <version>1.0.0</version>
+        <scope>provided</scope>
     </dependency>
 </dependencies>
 
@@ -141,77 +165,80 @@ Add the dependency and register the processor:
         </plugin>
     </plugins>
 </build>
+```
 
-Gradle
+### Gradle (Groovy DSL)
 
-dependencies {
-    implementation "io.github.injectiononly:injection-only-enforcer:1.0.0"
-    annotationProcessor "io.github.injectiononly:injection-only-enforcer:1.0.0"
+Add Maven Local while the artifact is not published:
+
+```groovy
+repositories {
+    mavenLocal()
+    mavenCentral()
 }
 
-How it works
+dependencies {
+    compileOnly "io.github.injectiononly:injection-only-enforcer:1.0.0"
+    annotationProcessor "io.github.injectiononly:injection-only-enforcer:1.0.0"
+}
+```
 
-This library is a Java annotation processor.
+### Gradle (Kotlin DSL)
 
-When the compiler sees  @InjectionOnly , it walks the annotated class and checks for manual instantiation via  new . If the constructed type is:
+```kotlin
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
 
-• not a JDK type
-• not explicitly whitelisted in  allow() 
+dependencies {
+    compileOnly("io.github.injectiononly:injection-only-enforcer:1.0.0")
+    annotationProcessor("io.github.injectiononly:injection-only-enforcer:1.0.0")
+}
+```
 
-then it raises a compiler error.
+## How it works
 
-In other words, it turns architectural intent into a build-time safeguard.
+The annotation processor checks `new` expressions in each annotated class. If
+the constructed type is not in `java.*` or `javax.*` and is not listed in
+`allow`, compilation fails with an error.
 
-Typical use cases
+## Typical use cases
 
-• Spring  @Service ,  @Component ,  @Repository  classes
-• application-layer orchestration logic
-• factories or orchestrators that should be IoC-driven
-• teams enforcing clean dependency boundaries
-• architecture governance in larger Java codebases
+- Spring `@Service`, `@Component`, and `@Repository` classes.
+- Application-layer orchestration logic.
+- Teams enforcing dependency boundaries and IoC conventions.
+- Java projects that want a lightweight compile-time architecture guardrail.
 
-Benefits
+## Limitations
 
-• Fail fast during compilation
-• Avoid runtime dependency surprises
-• Make IoC rules visible and enforceable
-• Improve testability and clarity
-• Encourage a cleaner architecture
+This project focuses on explicit `new` expressions inside the annotated class.
+It is a lightweight compile-time rule, not a complete architecture enforcement
+framework; it does not detect indirect construction performed by another class
+or factory. The rule applies to the annotated type's own constructors, methods,
+and initializers; nested and sibling type bodies are not checked unless those
+types are independently annotated.
 
-Limitations
+## Contributing
 
-This project is intentionally focused on the core rule:
+Contributions are welcome:
 
-• it enforces manual construction inside  @InjectionOnly  classes
-• it is designed as a lightweight compile-time guardrail
-• it is not a full architectural framework
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes and add or update relevant tests.
+4. Open a pull request.
 
-It is best used as a practical project-level enforcement tool, not as a replacement for a broader design review process.
+## License
 
-Contributing
+This project is licensed under the Apache License 2.0. See the
+[LICENSE](./LICENSE) file for details.
 
-Contributions are welcome.
+## Project status
 
-If you want to improve the project:
+InjectionOnly Enforcer is a lightweight Java utility for teams that value
+explicit dependency injection and want to make that convention enforceable at
+compile time.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add or update relevant tests
-5. Open a pull request
+## Contact
 
-License
-
-This project is licensed under the Apache License 2.0.
-
-See the [LICENSE](./LICENSE) file for details.
-
-Project status
-
-This project is currently designed as a lightweight open-source tooling library for Java applications that value explicit dependency injection discipline.
-
-It is especially suitable for teams that want stronger compile-time rules without introducing heavy architectural tooling.
-
-Contact
-
-For questions, ideas, or collaboration, please open an issue or contact the maintainer through the GitHub project.
+For questions, ideas, or collaboration, open an issue in the GitHub repository.
