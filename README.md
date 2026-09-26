@@ -9,6 +9,12 @@ services, repositories, clients, and other managed components should receive
 their collaborators through dependency injection rather than construct them
 manually.
 
+> [!IMPORTANT]
+> **Early-stage project:** InjectionOnly Enforcer began as a small experiment
+> in compile-time enforcement. It is shared publicly to invite community
+> review, feedback, and contributions. The API and behavior may evolve, so
+> please evaluate it for your use case before relying on it in production.
+
 ## Why this project exists
 
 In large Java applications, it is easy for a service to drift into patterns
@@ -269,7 +275,11 @@ types are independently annotated.
 
 ## Contributing
 
-Contributions are welcome:
+Community feedback is especially valuable while the project is taking shape.
+Use [GitHub Issues](https://github.com/vijayagopalsb/injection-only-enforcer/issues)
+to share use cases, report unexpected behavior, suggest improvements, or
+discuss a proposed change before starting substantial implementation work.
+Pull requests with focused changes and tests are welcome:
 
 1. Fork the repository.
 2. Create a feature branch.
@@ -283,9 +293,11 @@ This project is licensed under the Apache License 2.0. See the
 
 ## Project status
 
-InjectionOnly Enforcer is a lightweight Java utility for teams that value
-explicit dependency injection and want to make that convention enforceable at
-compile time.
+The core compile-time check and its initial examples are implemented, but the
+project is still at an early stage. Its current tests cover the documented
+behavior, not every Java language construct or build configuration. Feedback
+from Java and Spring developers can help validate whether the rule is useful,
+identify edge cases, and guide future development.
 
 ## Contact
 
