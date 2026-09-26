@@ -69,8 +69,27 @@ public @interface InjectionOnly {
 
 ## Usage
 
-Dependencies should be supplied to an `@InjectionOnly` class, typically through
-constructor injection:
+The examples below show both outcomes. Unless a constructed type is exempt,
+explicit `new` expressions inside an `@InjectionOnly` class are compile-time
+errors.
+
+### Disallowed: manually constructing a custom dependency
+
+```java
+import io.github.injectiononly.annotation.InjectionOnly;
+
+@InjectionOnly
+public class OrderService {
+    public void createOrder() {
+        PaymentClient client = new PaymentClient(); // Compile-time error
+        client.pay();
+    }
+}
+```
+
+Because `PaymentClient` is a custom type and is not listed in `allow`, the
+processor reports an error on `new PaymentClient()`. Pass the dependency into
+`OrderService` instead:
 
 ```java
 import io.github.injectiononly.annotation.InjectionOnly;
@@ -85,34 +104,63 @@ public class OrderService {
 
     public void createOrder() {
         paymentClient.pay();
-
-        // These constructions are rejected unless their types are exempt.
-        // new PaymentClient();
-        // new OrderValidator();
     }
 }
 ```
 
-For a complete Maven walkthrough, see the [demo guide](./DEMO.md).
+### Allowed: explicitly allowing a custom type
 
-## Allowing specific types
-
-Use `allow` for application or third-party types that are safe to construct
-directly, such as value objects:
+Sometimes a custom type is a simple value object or helper that is appropriate
+to construct directly. List that type in `allow`:
 
 ```java
 import io.github.injectiononly.annotation.InjectionOnly;
 
 @InjectionOnly(allow = {OrderRequest.class})
 public class OrderService {
-    public void create() {
-        OrderRequest request = new OrderRequest();
+    public void createOrder() {
+        OrderRequest request = new OrderRequest(); // Allowed by the allow list
     }
 }
 ```
 
-Types under `java.*` and `javax.*` do not need to be listed. For example,
-standard collection classes and exceptions are exempt automatically.
+`OrderRequest` is a custom class, but this construction is permitted because
+its type is listed in `@InjectionOnly(allow = {...})`. Other non-exempt custom
+types remain disallowed.
+
+### Allowed: standard `java.*` and `javax.*` types
+
+Types whose fully qualified names start with `java.` or `javax.` are exempt
+automatically, so they do not need to appear in the allow list:
+
+```java
+import io.github.injectiononly.annotation.InjectionOnly;
+import java.util.ArrayList;
+import java.util.List;
+
+@InjectionOnly
+public class OrderService {
+    public void createOrderNames() {
+        List<String> names = new ArrayList<>(); // Allowed: java.util.ArrayList
+        StringBuilder message = new StringBuilder("Orders"); // Allowed: java.lang.StringBuilder
+        javax.swing.JPanel panel = new javax.swing.JPanel(); // Allowed: javax.swing.JPanel
+
+        names.add(message.toString());
+    }
+}
+```
+
+The exemption is based on the constructed type's package name. It applies to
+any fully qualified type name starting with `java.` or `javax.`. It does not
+automatically exempt every third-party type or a package whose name merely
+contains `javax`.
+
+For a complete Maven walkthrough, see the [demo guide](./DEMO.md).
+
+## Allowing specific types
+
+Use the `allow` option for other application or third-party types that are
+safe to construct directly.
 
 ## Installation
 
